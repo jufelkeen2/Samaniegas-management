@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+}
+
+model Client {
+  id           String    @id @default(cuid())
+  name         String
+  phone        String
+  address      String
+  notes        String    @default("")
+  /// Total mensual que incluye las dos visitas fijas.
+  servicePrice Decimal   @db.Decimal(10, 2)
+  paymentDay   Int
+  visitDay1    Int       @default(7)
+  visitDay2    Int       @default(21)
+  active       Boolean   @default(true)
+  visits       Visit[]
+  payments     Payment[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([name])
+}
+
+model Visit {
+  id            String    @id @default(cuid())
+  clientId      String
+  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  scheduledDate DateTime  @db.Date
+  completed     Boolean   @default(false)
+  actualDate    DateTime? @db.Date
+  notes         String    @default("")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([scheduledDate])
+  @@index([clientId, scheduledDate])
+  @@unique([clientId, scheduledDate])
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  clientId    String
+  client      Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  amount      Decimal       @db.Decimal(10, 2)
+  dueDate     DateTime      @db.Date
+  paymentDate DateTime?     @db.Date
+  status      PaymentStatus @default(PENDING)
+  notes       String        @default("")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([dueDate])
+  @@index([status])
+  @@index([clientId, status])
+}
+
+model BusinessSettings {
+  id                    String   @id @default("main")
+  businessName          String   @default("Paisaje Verde")
+  ownerName             String   @default("")
+  phone                 String   @default("")
+  email                 String   @default("")
+  address               String   @default("")
+  defaultVisitsPerMonth Int      @default(2)
+  updatedAt             DateTime @updatedAt
+}

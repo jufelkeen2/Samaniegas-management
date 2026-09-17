@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+:root { --canvas: #f5f7f4; --ink: #1b2420; --muted: #68736d; --line: #dfe5e1; --forest: #246447; --forest-dark: #194a34; --forest-soft: #e6f2eb; --amber: #c96f25; --red: #b8473d; }
+@theme inline { --font-sans: var(--font-body); }
+body { background: var(--canvas); color: var(--ink); font-family: var(--font-body), Arial, sans-serif; letter-spacing: 0; }
+h1, h2, h3 { font-family: var(--font-display), Arial, sans-serif; letter-spacing: 0; }
+button, a, input, select, textarea { outline-color: var(--forest); }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .6; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+.field { width: 100%; border: 1px solid var(--line); border-radius: 6px; background: white; padding: .65rem .75rem; font-size: .875rem; color: var(--ink); }
+.field-icon-left { padding-left: 2.5rem; }
+.field-icon-both { padding-left: 2.5rem; padding-right: 2.5rem; }
+.field:focus { border-color: var(--forest); box-shadow: 0 0 0 3px color-mix(in srgb, var(--forest) 12%, transparent); }
+.label { display: block; margin-bottom: .35rem; font-size: .75rem; font-weight: 600; color: var(--muted); }
+.btn-primary { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: .5rem; border-radius: 6px; background: var(--forest); padding: .55rem .9rem; color: white; font-size: .875rem; font-weight: 600; transition: background .15s; }
+.btn-primary:hover { background: var(--forest-dark); }
+.btn-secondary { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: .5rem; border: 1px solid var(--line); border-radius: 6px; background: white; padding: .55rem .9rem; color: var(--ink); font-size: .875rem; font-weight: 600; }
+.btn-secondary:hover { background: #f8faf9; }
+.panel { border: 1px solid var(--line); border-radius: 8px; background: white; }
+.page-title { font-size: clamp(1.45rem, 3vw, 2rem); font-weight: 700; line-height: 1.2; }
