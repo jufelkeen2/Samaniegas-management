@@ -7,6 +7,13 @@ datasource db {
   provider = "postgresql"
 }
 
+model ApplicationCredential {
+  username       String   @id
+  passwordHash   String
+  sessionVersion Int      @default(1)
+  updatedAt      DateTime @updatedAt
+}
+
 enum PaymentStatus {
   PENDING
   PAID
