@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { CalendarDays, MapPin, Pencil, Phone, Plus, Search, Trash2 } from "lucide-react";
+import { FormEvent, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { CalendarDays, MapPin, Pencil, Phone, Plus, Search, Table2, Trash2, X } from "lucide-react";
 import { EmptyState, LoadingBlock, Modal, Notice, PageHeader, StatusPill } from "@/components/ui";
 import { usd } from "@/lib/format";
 
@@ -20,6 +20,8 @@ export default function ClientsPage() {
   const appleMaps = useSyncExternalStore(subscribeToDevice, deviceUsesAppleMaps, serverUsesAppleMaps);
   const [clients, setClients] = useState<Client[]>([]);
   const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const priceSheet = useRef<HTMLDialogElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -28,7 +30,7 @@ export default function ClientsPage() {
 
   const load = useCallback(async (search = query) => {
     setLoading(true); setError("");
-    try { const response = await fetch(`/api/clients?query=${encodeURIComponent(search)}`); if (!response.ok) throw new Error(); setClients(await response.json()); }
+    try { const response = await fetch("/api/clients", { cache: "no-store" }); if (!response.ok) throw new Error(); setClients(await response.json()); setAppliedQuery(search); }
     catch { setError("No se pudieron cargar los clientes."); }
     finally { setLoading(false); }
   }, [query]);
@@ -62,14 +64,37 @@ export default function ClientsPage() {
     catch { setError("No se pudo eliminar el cliente."); }
   }
 
+  const search = appliedQuery.trim().toLocaleLowerCase();
+  const visibleClients = clients.filter((client) => !search || [client.name, client.phone, client.address].some((value) => value.toLocaleLowerCase().includes(search)));
+  const sortedClients = [...clients].sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }) || a.id.localeCompare(b.id));
+  // Sum in cents so monthly prices retain their exact two-decimal amounts.
+  const totalMonthly = clients.reduce((sum, client) => sum + Math.round(client.servicePrice * 100), 0) / 100;
   const initial = editing === "new" || !editing ? blank : { ...editing, servicePrice: String(editing.servicePrice), paymentDay: String(editing.paymentDay) };
   return <>
-    <PageHeader title="Clientes" description={`${clients.length} registros visibles`} action={<button className="btn-primary" onClick={() => { setEditing("new"); setError(""); }}><Plus size={17} />Nuevo cliente</button>} />
+    <PageHeader title="Clientes" description={`${visibleClients.length} registros visibles`} action={<button className="btn-primary" onClick={() => { setEditing("new"); setError(""); }}><Plus size={17} />Nuevo cliente</button>} />
     {message && <Notice type="success">{message}</Notice>}{error && !editing && <Notice type="error">{error}</Notice>}
+    <section className="panel mb-5 flex flex-wrap items-center justify-between gap-4 p-5" aria-label="Resumen de precios">
+      <div><p className="text-sm font-semibold text-[var(--muted)]">Total mensual de clientes</p><p className="mt-1 text-3xl font-bold tabular-nums text-[var(--forest)]" aria-live="polite">{loading ? "Cargando..." : error ? "—" : usd.format(totalMonthly)}</p><p className="mt-1 text-xs text-[var(--muted)]">Suma de las tarifas mensuales de todos los clientes, activos e inactivos.</p></div>
+      <button type="button" className="btn-secondary" disabled={loading || Boolean(error)} onClick={() => priceSheet.current?.showModal()}><Table2 size={17} />Ver tabla de precios</button>
+    </section>
+    <dialog ref={priceSheet} aria-labelledby="price-sheet-title" aria-describedby="price-sheet-description" className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-6xl overflow-hidden rounded-lg border border-[var(--line)] bg-white p-0 text-[var(--ink)] shadow-xl backdrop:bg-black/40">
+      <div className="flex max-h-[90dvh] flex-col">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--line)] px-5 py-4"><div><h2 id="price-sheet-title" className="text-lg font-bold">Tabla de precios de clientes</h2><p id="price-sheet-description" className="mt-1 text-xs text-[var(--muted)]">Todos los clientes, ordenados por nombre. Se actualiza al agregar, editar o eliminar clientes.</p></div><button type="button" autoFocus onClick={() => priceSheet.current?.close()} className="grid size-10 shrink-0 place-items-center rounded-md hover:bg-gray-100" aria-label="Cerrar tabla de precios"><X size={19} /></button></div>
+        <div className="min-h-0 overflow-auto" tabIndex={0} role="region" aria-label="Hoja de precios; desliza para ver todas las columnas">
+          <table className="w-full min-w-[850px] border-collapse text-sm">
+            <caption className="sr-only">Tarifas mensuales en dólares (USD) de {clients.length} clientes y total general.</caption>
+            <thead className="sticky top-0 z-10 bg-[var(--forest)] text-white"><tr>{["#", "Cliente", "Teléfono", "Dirección", "Estado", "Día de pago", "Precio mensual (USD)"].map((title, index) => <th key={title} scope="col" className={`border border-white/20 px-3 py-3 ${index === 6 ? "text-right" : "text-left"}`}>{title}</th>)}</tr></thead>
+            <tbody>{sortedClients.map((client, index) => <tr key={client.id} className="odd:bg-white even:bg-gray-50 hover:bg-emerald-50"><th scope="row" className="border border-[var(--line)] px-3 py-3 text-center font-normal text-[var(--muted)]">{index + 1}</th><td className="border border-[var(--line)] px-3 py-3 font-semibold">{client.name}</td><td className="whitespace-nowrap border border-[var(--line)] px-3 py-3">{client.phone}</td><td className="min-w-52 border border-[var(--line)] px-3 py-3">{client.address}</td><td className="border border-[var(--line)] px-3 py-3">{client.active ? "Activo" : "Inactivo"}</td><td className="border border-[var(--line)] px-3 py-3 text-center">{client.paymentDay}</td><td className="whitespace-nowrap border border-[var(--line)] px-3 py-3 text-right tabular-nums">{usd.format(client.servicePrice)}</td></tr>)}{!clients.length && <tr><td colSpan={7} className="p-8 text-center text-[var(--muted)]">Agrega tu primer cliente para ver su precio aquí.</td></tr>}</tbody>
+            <tfoot className="sticky bottom-0 bg-emerald-50 font-bold text-[var(--forest)]"><tr><th scope="row" colSpan={6} className="border border-[var(--line)] px-3 py-4 text-left">TOTAL MENSUAL · {clients.length} clientes</th><td className="whitespace-nowrap border border-[var(--line)] px-3 py-4 text-right tabular-nums">{usd.format(totalMonthly)}</td></tr></tfoot>
+          </table>
+        </div>
+        <p className="shrink-0 border-t border-[var(--line)] px-5 py-3 text-xs text-[var(--muted)]">Incluye activos e inactivos. Cada precio mensual incluye las dos visitas. En el celular, desliza la tabla hacia los lados.</p>
+      </div>
+    </dialog>
     <form onSubmit={(event) => { event.preventDefault(); void load(query); }} className="panel mb-5 flex gap-2 p-3"><div className="relative flex-1"><Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" /><input className="field field-icon-left" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nombre, teléfono o dirección" aria-label="Buscar clientes" /></div><button className="btn-secondary" type="submit">Buscar</button></form>
-    {loading ? <LoadingBlock /> : <div className="panel overflow-hidden">{clients.length ? <>
+    {loading ? <LoadingBlock /> : <div className="panel overflow-hidden">{visibleClients.length ? <>
       <div className="hidden grid-cols-[1.1fr_1.25fr_1fr_.7fr_100px] gap-4 border-b border-[var(--line)] bg-gray-50 px-5 py-3 text-xs font-semibold uppercase text-[var(--muted)] md:grid"><span>Cliente</span><span>Contacto</span><span>Plan mensual</span><span>Saldo</span><span className="text-right">Acciones</span></div>
-      <div className="divide-y divide-[var(--line)]">{clients.map((client) => <article key={client.id} className="grid gap-4 px-4 py-4 md:grid-cols-[1.1fr_1.25fr_1fr_.7fr_100px] md:items-center md:px-5">
+      <div className="divide-y divide-[var(--line)]">{visibleClients.map((client) => <article key={client.id} className="grid gap-4 px-4 py-4 md:grid-cols-[1.1fr_1.25fr_1fr_.7fr_100px] md:items-center md:px-5">
         <div className="min-w-0"><div className="flex items-center gap-2"><span className="grid size-9 shrink-0 place-items-center rounded-md bg-[var(--forest-soft)] font-bold text-[var(--forest)]">{client.name.charAt(0)}</span><div className="min-w-0"><p className="truncate text-sm font-semibold">{client.name}</p><StatusPill kind={client.active ? "green" : "gray"}>{client.active ? "Activo" : "Inactivo"}</StatusPill></div></div></div>
         <div className="min-w-0 space-y-1 text-xs text-[var(--muted)]"><a href={`tel:${client.phone.replace(/[^\d+]/g, "")}`} className="flex min-h-10 items-center gap-2 rounded-sm underline decoration-dotted underline-offset-4 hover:text-[var(--forest)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--forest)]" aria-label={`Llamar a ${client.name}: ${client.phone}`}><Phone size={14} className="shrink-0" aria-hidden="true" />{client.phone}</a><a href={appleMaps ? `https://maps.apple.com/?q=${encodeURIComponent(client.address)}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.address)}`} target="_blank" rel="noopener noreferrer" className="flex min-h-10 items-center gap-2 rounded-sm underline decoration-dotted underline-offset-4 hover:text-[var(--forest)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--forest)]" aria-label={`Ver dirección de ${client.name} en ${appleMaps ? "Apple Maps" : "Google Maps"} (se abre en otra pestaña)`}><MapPin size={14} className="shrink-0" aria-hidden="true" /><span className="min-w-0 break-words">{client.address}</span></a></div>
         <div><p className="text-sm font-semibold">{usd.format(client.servicePrice)} <span className="font-normal text-[var(--muted)]">/ mes</span></p><p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-[var(--forest)]"><CalendarDays size={14} />Incluye visitas los días {client.visitDay1} y {client.visitDay2}</p><p className="mt-1 text-xs text-[var(--muted)]">Paga el día {client.paymentDay}</p></div>
