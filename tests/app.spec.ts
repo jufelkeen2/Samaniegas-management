@@ -23,7 +23,7 @@ test("carga las áreas principales sin errores de consola", async ({ page }, tes
     ["/", "Resumen del negocio"],
     ["/clientes", "Clientes"],
     ["/calendario", "Calendario de servicios"],
-    ["/pagos", "Pagos"],
+    ["/pagos", "Clientes"],
     ["/configuracion", "Configuración"],
   ];
   for (const [path, heading] of pages) {
@@ -100,7 +100,9 @@ test("filtra la agenda por cliente y estado", async ({ page }, testInfo) => {
 
 test("presenta el cobro como monto mensual", async ({ page }) => {
   await page.goto("/pagos");
-  await page.getByRole("button", { name: "Registrar pago" }).click();
+  await expect(page).toHaveURL(/\/clientes$/);
+  await page.getByRole("button", { name: /^Ver ficha de / }).first().click();
+  await page.getByRole("button", { name: "Registrar pago", exact: true }).click();
   await expect(page.getByLabel("Monto mensual (USD) *")).toBeVisible();
   await expect(page.getByText("Incluye las dos visitas del mes.")).toBeVisible();
 });
